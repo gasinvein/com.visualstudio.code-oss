@@ -3,6 +3,19 @@
 set -e
 set -o pipefail
 
+function query_manifest() {
+    mf_path="$1"
+    jq_query="$2"
+    if [[ "$mf_path" =~ .*\.(yml|yaml) ]]; then
+        python3 -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)' \
+        < "$mf_path" | jq -e -r "$jq_query"
+    elif [[ "$mf_path" =~ .*\.json ]]; then
+        jq -e -r "$jq_query" < "$mf_path"
+    else
+        return 1
+    fi
+}
+
 while getopts ":m:n:t:c:" opt; do
     case "$opt" in
         m)
@@ -23,25 +36,12 @@ while getopts ":m:n:t:c:" opt; do
     esac
 done
 
-function query_manifest() {
-    mf_path="$1"
-    jq_query="$2"
-    if [[ "$mf_path" =~ .*\.(yml|yaml) ]]; then
-        python3 -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)' \
-        < "$mf_path" | jq -e -r "$jq_query"
-    elif [[ "$mf_path" =~ .*\.json ]]; then
-        jq -e -r "$jq_query" < "$mf_path"
-    else
-        return 1
-    fi
-}
-
-TOOLS_CLONE_URL="https://github.com/flatpak/flatpak-builder-tools.git"
-TOOLS_CLONE_DIR="${TOOLS_CLONE_DIR:-$(mktemp -d --suffix=.flatpak-builder-tools)}"
-
 if [ ! -f "$MANIFEST_PATH" ]; then
     exit 1
 fi
+
+TOOLS_CLONE_URL="https://github.com/flatpak/flatpak-builder-tools.git"
+TOOLS_CLONE_DIR="${TOOLS_CLONE_DIR:-$(mktemp -d --suffix=.flatpak-builder-tools)}"
 
 read -r FLATPAK_ID < <(
     query_manifest "$MANIFEST_PATH" 'if has("app-id") then ."app-id" else .id end'
